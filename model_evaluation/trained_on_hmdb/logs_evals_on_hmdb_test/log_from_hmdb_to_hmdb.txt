@@ -1,0 +1,19 @@
+Options: Namespace(dataset='hmdb', learning_rate=0.0001, tasks_per_batch=16, checkpoint_dir='checkpoint_dir_from_hmdb_to_hmdb/', test_model_path='checkpoint_hmdb.pt', training_iterations=1, resume_from_checkpoint=False, way=5, shot=5, query_per_class=4, query_per_class_test=1, test_iters=[1], num_test_tasks=1000, print_freq=1, seq_len=8, num_workers=10, method='resnet50', trans_linear_out_dim=1152, opt='sgd', trans_dropout=0.1, save_freq=500, img_size=224, temp_set=[2], scratch='./imp_datasets/', num_gpus=0, debug_loader=False, split=3, sch=[1000000], test_model_only=True, trans_linear_in_dim=2048, traintestlist='./imp_datasets/splits/hmdb_ARN', path='./imp_datasets/hmdb_selected.zip')
+
+Checkpoint Directory: checkpoint_dir_from_hmdb_to_hmdb/
+
+Task [2/1], Train Loss: 0.3976120, Train Accuracy: 0.9500000
+
+(env_ani) oneai@tor-appdev-billy-7dd854c9d-2t7jb:~/strm$ python3 run.py -c checkpoint_dir_from_hmdb_to_hmdb/ --query_per_class 4 --shot 5 --way 5 --trans_linear_out_dim 1152 --tasks_per_batch 16 --test_iters 1 --dataset hmdb --split 3 -lr 0.0001 --method resnet50 --img_size 224 --scratch new --num_gpus 0 --print_freq 1 --save_freq 500 --training_iterations 1 --temp_set 2 --test_model_only True --test_model_path checkpoint_hmdb.pt
+Random Seed:  8066
+Options: Namespace(dataset='hmdb', learning_rate=0.0001, tasks_per_batch=16, checkpoint_dir='checkpoint_dir_from_hmdb_to_hmdb/', test_model_path='checkpoint_hmdb.pt', training_iterations=1, resume_from_checkpoint=False, way=5, shot=5, query_per_class=4, query_per_class_test=1, test_iters=[1], num_test_tasks=1000, print_freq=1, seq_len=8, num_workers=10, method='resnet50', trans_linear_out_dim=1152, opt='sgd', trans_dropout=0.1, save_freq=500, img_size=224, temp_set=[2], scratch='./imp_datasets/', num_gpus=0, debug_loader=False, split=3, sch=[1000000], test_model_only=True, trans_linear_in_dim=2048, traintestlist='./imp_datasets/splits/hmdb_ARN', path='./imp_datasets/hmdb_selected.zip')
+
+Checkpoint Directory: checkpoint_dir_from_hmdb_to_hmdb/
+
+loaded ./imp_datasets/hmdb_selected.zip
+train: 4280, test: 1292
+Model being tested at path: checkpoint_hmdb.pt
+/opt/conda/envs/env_ani/lib/python3.9/site-packages/torch/nn/functional.py:718: UserWarning: Named tensors and all their associated APIs are an experimental feature and subject to change. Please do not use them for anything important until they are released as stable. (Triggered internally at  /pytorch/c10/core/TensorImpl.h:1156.)
+  return torch.max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode)
+{'hmdb': {'accuracy': 74.38000113815069, 'confidence': 1.2421136920702684, 'loss': 0.004726813869667239}}
+Task [2/1], Train Loss: 0.3976120, Train Accuracy: 0.9500000
