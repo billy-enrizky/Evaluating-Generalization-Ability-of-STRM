@@ -1,6 +1,0 @@
-Options: Namespace(dataset='ucf', learning_rate=0.0001, tasks_per_batch=16, checkpoint_dir='checkpoint_dir_from_kinetics_to_ucf/', test_model_path='checkpoint_kinetics.pt', training_iterations=1, resume_from_checkpoint=False, way=5, shot=5, query_per_class=4, query_per_class_test=1, test_iters=[1], num_test_tasks=1000, print_freq=1, seq_len=8, num_workers=10, method='resnet50', trans_linear_out_dim=1152, opt='sgd', trans_dropout=0.1, save_freq=500, img_size=224, temp_set=[2], scratch='./imp_datasets/', num_gpus=0, debug_loader=False, split=3, sch=[1000000], test_model_only=True, trans_linear_in_dim=2048, traintestlist='./imp_datasets/splits/ucf_ARN', path='./imp_datasets/ucf_256x256q5.zip')
-
-Checkpoint Directory: checkpoint_dir_from_kinetics_to_ucf/
-
-
-2024-06-23 17:37:26,925 INFO: the testing loss is 0.001299741883878596 and Testing Accuracy is 95.0200002849102
