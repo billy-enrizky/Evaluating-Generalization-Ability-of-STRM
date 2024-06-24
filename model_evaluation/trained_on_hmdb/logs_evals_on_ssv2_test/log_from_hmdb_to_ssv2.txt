@@ -1,0 +1,17 @@
+Options: Namespace(dataset='ssv2', learning_rate=0.001, tasks_per_batch=16, checkpoint_dir='checkpoint_dir_ssv2_new_v4/', test_model_path='checkpoint_hmdb.pt', training_iterations=1, resume_from_checkpoint=False, way=5, shot=5, query_per_class=4, query_per_class_test=1, test_iters=[1], num_test_tasks=1000, print_freq=1, seq_len=8, num_workers=10, method='resnet50', trans_linear_out_dim=1152, opt='sgd', trans_dropout=0.1, save_freq=1, img_size=224, temp_set=[2], scratch='./imp_datasets/', num_gpus=0, debug_loader=False, split=7, sch=[1000000], test_model_only=True, trans_linear_in_dim=2048, traintestlist='./imp_datasets/splits/ssv2_OTAM', path='./imp_datasets/ssv2_selected.zip')
+
+Checkpoint Directory: checkpoint_dir_ssv2_new_v4/
+
+(env_ani) oneai@tor-appdev-billy-cccc6b6bc-7n428:~/strm$ python3 run.py -c checkpoint_dir_ssv2_new_v4/ --query_per_class 4 --shot 5 --way 5 --trans_linear_out_dim 1152 --tasks_per_batch 16 --test_iters 1 --dataset ssv2 --split 7 -lr 0.001 --method resnet50 --img_size 224 --scratch new --num_gpus 0 --print_freq 1 --save_freq 1 --training_iterations 1 --temp_set 2 --test_model_only True --test_model_path checkpoint_hmdb.pt
+^[Random Seed:  9197
+Options: Namespace(dataset='ssv2', learning_rate=0.001, tasks_per_batch=16, checkpoint_dir='checkpoint_dir_ssv2_new_v4/', test_model_path='checkpoint_hmdb.pt', training_iterations=1, resume_from_checkpoint=False, way=5, shot=5, query_per_class=4, query_per_class_test=1, test_iters=[1], num_test_tasks=1000, print_freq=1, seq_len=8, num_workers=10, method='resnet50', trans_linear_out_dim=1152, opt='sgd', trans_dropout=0.1, save_freq=1, img_size=224, temp_set=[2], scratch='./imp_datasets/', num_gpus=0, debug_loader=False, split=7, sch=[1000000], test_model_only=True, trans_linear_in_dim=2048, traintestlist='./imp_datasets/splits/ssv2_OTAM', path='./imp_datasets/ssv2_selected.zip')
+
+Checkpoint Directory: checkpoint_dir_ssv2_new_v4/
+
+loaded ./imp_datasets/ssv2_selected.zip
+train: 66166, test: 2816
+Model being tested at path: checkpoint_hmdb.pt
+/opt/conda/envs/env_ani/lib/python3.9/site-packages/torch/nn/functional.py:718: UserWarning: Named tensors and all their associated APIs are an experimental feature and subject to change. Please do not use them for anything important until they are released as stable. (Triggered internally at  /pytorch/c10/core/TensorImpl.h:1156.)
+  return torch.max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode)
+{'ssv2': {'accuracy': 38.080000875890256, 'confidence': 1.3538388784005846, 'loss': 0.011150541143491864}}
+
