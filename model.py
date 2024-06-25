@@ -553,7 +553,7 @@ if __name__ == "__main__":
             self.trans_dropout = 0.1
             self.seq_len = 8 
             self.img_size = 84
-            self.method = "resnet18"
+            self.method = "resnet50"
             self.num_gpus = 1
             self.temp_set = [2,3]
     args = ArgsObject()
