@@ -125,11 +125,11 @@ class Learner:
         parser.add_argument("--trans_linear_out_dim", type=int, default=1152, help="Transformer linear_out_dim")
         parser.add_argument("--opt", choices=["adam", "sgd"], default="sgd", help="Optimizer")
         parser.add_argument("--trans_dropout", type=int, default=0.1, help="Transformer dropout")
-        parser.add_argument("--save_freq", type=int, default=5000, help="Number of iterations between checkpoint saves.")
+        parser.add_argument("--save_freq", type=int, default=1000, help="Number of iterations between checkpoint saves.")
         parser.add_argument("--img_size", type=int, default=224, help="Input image size to the CNN after cropping.")
         parser.add_argument('--temp_set', nargs='+', type=int, help='cardinalities e.g. 2,3 is pairs and triples', default=[2,3])
-        parser.add_argument("--scratch", choices=["bc", "bp", "new"], default="bp", help="directory containing dataset, splits, and checkpoint saves.")
-        parser.add_argument("--num_gpus", type=int, default=1, help="Number of GPUs to split the ResNet over")
+        parser.add_argument("--scratch", choices=["bc", "bp", "new"], default="new", help="directory containing dataset, splits, and checkpoint saves.")
+        parser.add_argument("--num_gpus", type=int, default=0, help="Number of GPUs to split the ResNet over")
         parser.add_argument("--debug_loader", default=False, action="store_true", help="Load 1 vid per class for debugging")
         parser.add_argument("--split", type=int, default=7, help="Dataset split.")
         parser.add_argument('--sch', nargs='+', type=int, help='iters to drop learning rate', default=[1000000])
@@ -145,7 +145,7 @@ class Learner:
             args.num_workers = 3
             args.scratch = "/work/tp8961"
         elif args.scratch == "new":
-            args.scratch = "./imp_datasets/"
+            args.scratch = "./datasets_and_splits/"
         
         if args.checkpoint_dir == None:
             print("need to specify a checkpoint dir")
@@ -160,17 +160,16 @@ class Learner:
         
         if args.dataset == "ssv2":
             args.traintestlist = os.path.join(args.scratch, "splits/ssv2_OTAM/")
-            args.path = os.path.join(args.scratch, "ssv2_256x256q5/")
+            args.path = os.path.join(args.scratch, "datasets/ssv2_256x256q5.zip")
         elif args.dataset == "kinetics":
-            args.traintestlist = os.path.join(args.scratch, "video_datasets/splits/kineticsTrainTestlist")
-            args.path = os.path.join(args.scratch, "video_datasets/data/kinetics_256q5_1.zip")
+            args.traintestlist = os.path.join(args.scratch, "splits/kinetics_CMN")
+            args.path = os.path.join(args.scratch, "datasets/kinetics_256x256q5.zip")
         elif args.dataset == "ucf":
-            args.traintestlist = os.path.join(args.scratch, "video_datasets/splits/ucfTrainTestlist")
-            args.path = os.path.join(args.scratch, "video_datasets/data/UCF-101_320.zip")
+            args.traintestlist = os.path.join(args.scratch, "splits/ucf_ARN")
+            args.path = os.path.join(args.scratch, "datasets/ucf_256x256q5.zip")
         elif args.dataset == "hmdb":
             args.traintestlist = os.path.join(args.scratch, "splits/hmdb_ARN")
-            args.path = os.path.join(args.scratch, "hmdb_256x256q5.zip")
-            # args.path = os.path.join(args.scratch, "video_datasets/data/hmdb51_jpegs_256.zip")
+            args.path = os.path.join(args.scratch, "datasets/hmdb_256x256q5.zip")
 
         with open("args.pkl", "wb") as f:
             pickle.dump(args, f, pickle.HIGHEST_PROTOCOL)
@@ -355,13 +354,17 @@ class Learner:
         torch.save(d, os.path.join(self.checkpoint_dir, 'checkpoint.pt'))
 
     def load_checkpoint(self):
+        gpu_device = 'cuda'
         if self.args.test_model_only:
             checkpoint = torch.load(self.args.test_model_path, torch.device('gpu' if torch.cuda.is_available() else 'cpu'))
         else:
            checkpoint = torch.load(os.path.join(self.checkpoint_dir, 'checkpoint.pt'))
         self.start_iteration = checkpoint['iteration']
         state_dict = {k.replace('module.', ''):v for k,v in checkpoint['model_state_dict'].items()}
-        self.model.load_state_dict(state_dict)
+        if self.device == gpu_device:
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+        else:
+            self.model.load_state_dict(state_dict)
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.scheduler.load_state_dict(checkpoint['scheduler'])
 

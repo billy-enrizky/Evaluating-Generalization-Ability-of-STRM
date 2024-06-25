@@ -55,7 +55,11 @@ class DistanceLoss(nn.Module):
         # generate all ordered tuples corresponding to the temporal set size 2 or 3.
         frame_idxs = [i for i in range(self.args.seq_len)]
         frame_combinations = combinations(frame_idxs, temporal_set_size)
-        self.tuples = [torch.tensor(comb) for comb in frame_combinations]
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        if device=='cuda':
+            self.tuples = [torch.tensor(comb).cuda() for comb in frame_combinations]
+        else:
+            self.tuples = [torch.tensor(comb) for comb in frame_combinations]
         self.tuples_len = len(self.tuples) # 28 for tempset_2
 
         # nn.Linear(4096, 1024)
@@ -158,7 +162,11 @@ class TemporalCrossTransformer(nn.Module):
         # generate all ordered tuples corresponding to the temporal set size 2 or 3.
         frame_idxs = [i for i in range(self.args.seq_len)]
         frame_combinations = combinations(frame_idxs, temporal_set_size)
-        self.tuples = [torch.tensor(comb) for comb in frame_combinations]
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        if device=='cuda':
+            self.tuples = [torch.tensor(comb).cuda() for comb in frame_combinations]
+        else:
+            self.tuples = [torch.tensor(comb) for comb in frame_combinations]
         self.tuples_len = len(self.tuples) #28
     
     def forward(self, support_set, support_labels, queries):
