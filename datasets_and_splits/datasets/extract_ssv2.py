@@ -6,8 +6,8 @@ from joblib import Parallel, delayed
 
 out_h = 256
 out_w = 256
-in_folder = 'data/ssv2/'
-out_folder = 'data/ssv2_{}x{}q5'.format(out_w,out_h)
+in_folder = 'ssv2_dataset/'
+out_folder = 'ssv2_{}x{}q5'.format(out_w,out_h)
 
 split_dir = "splits/ssv2_OTAM"
 
