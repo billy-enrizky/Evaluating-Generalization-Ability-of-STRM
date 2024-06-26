@@ -6,8 +6,8 @@ from joblib import Parallel, delayed
 
 out_h = 256
 out_w = 256
-in_folder = 'data/UCF-101/'
-out_folder = 'data/ucf_{}x{}q5'.format(out_w,out_h)
+in_folder = 'datasets/UCf101_dataset/'
+out_folder = 'datasets//ucf_{}x{}q5'.format(out_w,out_h)
 
 split_dir = "splits/ucf_ARN"
 
