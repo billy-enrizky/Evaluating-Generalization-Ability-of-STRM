@@ -6,10 +6,10 @@ from joblib import Parallel, delayed
 
 out_h = 256
 out_w = 256
-in_folder = 'data/hmdb51_org/'
-out_folder = 'data/hmdb_{}x{}q5'.format(out_w,out_h)
+in_folder = 'datasets/sv2_dataset/'
+out_folder = 'datasets/ssv2_{}x{}q5'.format(out_w,out_h)
 
-split_dir = "splits/hmdb_ARN"
+split_dir = "splits/ssv2_OTAM"
 
 wc = os.path.join(split_dir, "*.txt")
 
@@ -24,8 +24,6 @@ try:
     os.mkdir(out_folder)
 except:
     pass
-
-
 
 
 for fn in glob(wc):
@@ -58,12 +56,9 @@ for fn in glob(wc):
         except:
             pass
 
-
-
     cmds = []
-
     for v, c in zip(vids, classes):
-        source_vid = os.path.join(in_folder, c, "{}.avi".format(v))
+        source_vid = os.path.join(in_folder, "{}.webm".format(v))
         extract_dir = os.path.join(out_folder, cur_split, c, v)
 
         if os.path.exists(extract_dir):

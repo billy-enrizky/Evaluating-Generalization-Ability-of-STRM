@@ -50,6 +50,3 @@ The Something Something V2 Dataset was created with the help of more than 5,400 
    ```
 
 Following these steps will prepare the Something Something V2 Dataset for use in your machine learning projects.
-```
-
-Let me know if you need any more details or modifications!
