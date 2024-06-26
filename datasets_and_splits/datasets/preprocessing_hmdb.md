@@ -7,6 +7,8 @@ HMDB51 is a large collection of realistic videos from various sources, including
 
 1. **Download the dataset:**
    Download the dataset from [here](https://serre-lab.clps.brown.edu/resource/hmdb-a-large-human-motion-database/#Downloads). The file will be named `hmdb51_org.rar`.
+   Or alternatively 
+   `wget http://serre-lab.clps.brown.edu/wp-content/uploads/2013/10/hmdb51_org.rar`
 
 2. **Install `unrar`:**
    ```bash
