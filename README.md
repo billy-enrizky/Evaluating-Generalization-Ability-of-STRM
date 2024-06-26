@@ -1,4 +1,4 @@
-# Benchmarking and Generalization of STRM
+# Evaluating the Generalization Ability of STRM
 
 This repository is dedicated to evaluating the generalization ability of the STRM model. We extend our gratitude to the authors of the original STRM model and the pretrained weights:
 
