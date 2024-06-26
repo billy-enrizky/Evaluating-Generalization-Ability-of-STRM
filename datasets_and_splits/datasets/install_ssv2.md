@@ -15,7 +15,7 @@ The Something Something V2 Dataset was created with the help of more than 5,400 
 ## Dataset Instructions
 
 ### Step 1: Download and Extract the Dataset
-1. Download all 20 zip files from the dataset source.
+1. Download all 20 zip files from the dataset source:  [Qualcomm AI Datasets - Something Something V2](https://developer.qualcomm.com/software/ai-datasets/something-something).
 2. Open a terminal on an Ubuntu system.
 3. Run the following command to unzip all files:
    ```bash
