@@ -321,20 +321,55 @@ class Learner:
         
         return accuracy_dict
 
-
     def prepare_task(self, task_dict, images_to_device = True):
+        """
+        This function prepares the task for the model. It takes as input a dictionary of task data and a boolean flag 
+        indicating whether to move the images to the device specified in self.device.
+
+        Parameters:
+        task_dict (dict): A dictionary containing the task data. It should have the following keys:
+            - 'support_set': A tensor representing the support set images.
+            - 'support_labels': A tensor representing the labels of the support set images.
+            - 'target_set': A tensor representing the target set images.
+            - 'target_labels': A tensor representing the labels of the target set images.
+            - 'real_target_labels': A tensor representing the real labels of the target set images.
+            - 'batch_class_list': A list representing the classes in the batch.
+        images_to_device (bool): A flag indicating whether to move the images to the device specified in self.device. 
+                                Default is True.
+
+        Returns:
+        context_images (torch.Tensor): The support set images, moved to the device if images_to_device is True.
+        target_images (torch.Tensor): The target set images, moved to the device if images_to_device is True.
+        context_labels (torch.Tensor): The labels of the support set images, always moved to the device.
+        target_labels (torch.Tensor): The labels of the target set images, converted to LongTensor and moved to the device.
+        real_target_labels (torch.Tensor): The real labels of the target set images.
+        batch_class_list (list): The list of classes in the batch.
+        """
+
+        # Extract the support set images and labels from the task dictionary
         context_images, context_labels = task_dict['support_set'][0], task_dict['support_labels'][0]
+        
+        # Extract the target set images and labels from the task dictionary
         target_images, target_labels = task_dict['target_set'][0], task_dict['target_labels'][0]
+        
+        # Extract the real target labels and the batch class list from the task dictionary
         real_target_labels = task_dict['real_target_labels'][0]
         batch_class_list = task_dict['batch_class_list'][0]
 
+        # If images_to_device is True, move the support and target set images to the device
         if images_to_device:
             context_images = context_images.to(self.device)
             target_images = target_images.to(self.device)
+        
+        # Move the support set labels to the device
         context_labels = context_labels.to(self.device)
+        
+        # Convert the target set labels to LongTensor and move them to the device
         target_labels = target_labels.type(torch.LongTensor).to(self.device)
 
-        return context_images, target_images, context_labels, target_labels, real_target_labels, batch_class_list  
+        # Return the prepared data
+        return context_images, target_images, context_labels, target_labels, real_target_labels, batch_class_list
+
 
     def shuffle(self, images, labels):
         """
