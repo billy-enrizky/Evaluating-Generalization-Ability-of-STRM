@@ -20,29 +20,106 @@ torch.cuda.manual_seed_all(3483)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class PositionalEncoding(nn.Module):
-    "Implement the PE function."
+    """
+    Implements the Positional Encoding (PE) function to inject information about the relative or absolute position of 
+    tokens in a sequence, which helps the model to understand the position of the words in the input sequence.
+
+    Args:
+        d_model (int): The dimension of the model. This is the size of the embedding vector.
+        dropout (float): The dropout rate to be applied after adding the positional encodings.
+        max_len (int, optional): The maximum length of the input sequences. Default is 5000.
+        pe_scale_factor (float, optional): A scaling factor for the positional encodings. Default is 0.1.
+
+    Attributes:
+        dropout (nn.Dropout): Dropout layer applied to the positional encodings.
+        pe_scale_factor (float): Scaling factor for the positional encodings.
+        pe (torch.Tensor): The positional encodings tensor of shape (1, max_len, d_model).
+
+    Methods:
+        forward(x):
+            Adds positional encodings to the input tensor and applies dropout.
+
+    Example:
+        >>> pe = PositionalEncoding(d_model=512, dropout=0.1)
+        >>> input_tensor = torch.randn(10, 32, 512)  # (sequence_length, batch_size, d_model)
+        >>> output_tensor = pe(input_tensor)
+
+    Raises:
+        ValueError: If the dimensions of the input tensor do not match the expected dimensions.
+    """
+
     def __init__(self, d_model, dropout, max_len=5000, pe_scale_factor=0.1):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.pe_scale_factor = pe_scale_factor
+
         # Compute the positional encodings once in log space.
-        # pe is of shape max_len(5000) x 2048(last layer of FC)
+        # pe is of shape (max_len, d_model)
         pe = torch.zeros(max_len, d_model)
-        # position is of shape 5000 x 1
+        # position is of shape (max_len, 1)
         position = torch.arange(0, max_len).unsqueeze(1)
+        # div_term is of shape (d_model // 2)
         div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term) * self.pe_scale_factor
         pe[:, 1::2] = torch.cos(position * div_term) * self.pe_scale_factor
-        # pe contains a vector of shape 1 x 5000 x 2048
+        # pe contains a vector of shape (1, max_len, d_model)
         pe = pe.unsqueeze(0)
         self.register_buffer('pe', pe)
-                          
+
     def forward(self, x):
-       x = x + Variable(self.pe[:, :x.size(1)], requires_grad=False)
-       return self.dropout(x)
+        """
+        Args:
+            x (torch.Tensor): The input tensor of shape (batch_size, sequence_length, d_model).
+
+        Returns:
+            torch.Tensor: The tensor with positional encodings added, of the same shape as the input tensor.
+
+        Raises:
+            ValueError: If the dimensions of the input tensor do not match the expected dimensions.
+        """
+        if x.dim() != 3 or x.size(2) != self.pe.size(2):
+            raise ValueError('Expected input tensor of shape (batch_size, sequence_length, d_model) '
+                             'but got {}'.format(x.shape))
+        
+        x = x + Variable(self.pe[:, :x.size(1)], requires_grad=False)
+        return self.dropout(x)
 
 class DistanceLoss(nn.Module):
-    "Compute the Query-class similarity on the patch-enriched features."
+    """
+    Compute the Query-class similarity on the patch-enriched features.
+
+    Args:
+        args (Namespace): The arguments containing hyperparameters and configurations.
+        temporal_set_size (int, optional): The size of the temporal set. Default is 3.
+
+    Attributes:
+        args (Namespace): The arguments containing hyperparameters and configurations.
+        temporal_set_size (int): The size of the temporal set.
+        dropout (nn.Dropout): Dropout layer applied to the input features.
+        tuples (list of torch.Tensor): List of all ordered tuples corresponding to the temporal set size.
+        tuples_len (int): The length of the tuples list.
+        clsW (nn.Linear): Linear layer for classifying the support and query embeddings.
+        relu (nn.ReLU): ReLU activation function.
+
+    Methods:
+        forward(support_set, support_labels, queries):
+            Computes the distance loss between support set and queries.
+
+        _extract_class_indices(labels, which_class):
+            Extracts the indices of elements which have the specified label.
+
+    Example:
+        >>> args = Namespace(seq_len=8, trans_linear_in_dim=2048, way=5)
+        >>> distance_loss = DistanceLoss(args)
+        >>> support_set = torch.randn(25, 8, 2048)
+        >>> support_labels = torch.randint(0, 5, (25,))
+        >>> queries = torch.randn(20, 8, 2048)
+        >>> output = distance_loss(support_set, support_labels, queries)
+
+    Raises:
+        ValueError: If `degrees` is a single number and is not positive, or if it is a sequence and its length is not 2.
+    """
+
     def __init__(self, args, temporal_set_size=3):
         super(DistanceLoss, self).__init__()
 
@@ -50,91 +127,97 @@ class DistanceLoss(nn.Module):
         self.temporal_set_size = temporal_set_size
 
         max_len = int(self.args.seq_len * 1.5)
-        self.dropout = nn.Dropout(p = 0.1)
+        self.dropout = nn.Dropout(p=0.1)
 
-        # generate all ordered tuples corresponding to the temporal set size 2 or 3.
+        # Generate all ordered tuples corresponding to the temporal set size 2 or 3.
         frame_idxs = [i for i in range(self.args.seq_len)]
         frame_combinations = combinations(frame_idxs, temporal_set_size)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        if device=='cuda':
+        if device == 'cuda':
             self.tuples = [torch.tensor(comb).cuda() for comb in frame_combinations]
         else:
             self.tuples = [torch.tensor(comb) for comb in frame_combinations]
-        self.tuples_len = len(self.tuples) # 28 for tempset_2
+        self.tuples_len = len(self.tuples)  # 28 for temporal set size 2
 
-        # nn.Linear(4096, 1024)
-        self.clsW = nn.Linear(self.args.trans_linear_in_dim * self.temporal_set_size, self.args.trans_linear_in_dim//2)
-        self.relu = torch.nn.ReLU() 
-
+        # Define the classification linear layer and ReLU activation function
+        self.clsW = nn.Linear(self.args.trans_linear_in_dim * self.temporal_set_size, self.args.trans_linear_in_dim // 2)
+        self.relu = torch.nn.ReLU()
 
     def forward(self, support_set, support_labels, queries):
-        # support_set : 25 x 8 x 2048, support_labels: 25, queries: 20 x 8 x 2048
-        n_queries = queries.shape[0] #20
-        n_support = support_set.shape[0] #25
-        
-        # Add a dropout before creating tuples
-        support_set = self.dropout(support_set) # 25 x 8 x 2048
-        queries = self.dropout(queries) # 20 x 8 x 2048
+        """
+        Args:
+            support_set (torch.Tensor): Support set of shape (25, 8, 2048).
+            support_labels (torch.Tensor): Labels for the support set of shape (25,).
+            queries (torch.Tensor): Query set of shape (20, 8, 2048).
 
-        # construct new queries and support set made of tuples of images after pe
-        # Support set s = number of tuples(28 for 2/56 for 3) stacked in a list form containing elements of form 25 x 4096(2 x 2048 - (2 frames stacked))
+        Returns:
+            dict: Dictionary containing the logits tensor of shape (20, 5).
+        """
+        n_queries = queries.shape[0]  # 20
+        n_support = support_set.shape[0]  # 25
+
+        # Add a dropout before creating tuples
+        support_set = self.dropout(support_set)  # 25 x 8 x 2048
+        queries = self.dropout(queries)  # 20 x 8 x 2048
+
+        # Construct new queries and support set made of tuples of images after positional encoding
         s = [torch.index_select(support_set, -2, p).reshape(n_support, -1) for p in self.tuples]
         q = [torch.index_select(queries, -2, p).reshape(n_queries, -1) for p in self.tuples]
 
-        support_set = torch.stack(s, dim=-2).to(device) # 25 x 28 x 4096
-        queries = torch.stack(q, dim=-2) # 20 x 28 x 4096
+        support_set = torch.stack(s, dim=-2).to(device)  # 25 x 28 x 4096
+        queries = torch.stack(q, dim=-2)  # 20 x 28 x 4096
         support_labels = support_labels.to(device)
-        unique_labels = torch.unique(support_labels) # 5
+        unique_labels = torch.unique(support_labels)  # 5
 
-        query_embed = self.clsW(queries.view(-1, self.args.trans_linear_in_dim*self.temporal_set_size)) # 560[20x28] x 1024
+        query_embed = self.clsW(queries.view(-1, self.args.trans_linear_in_dim * self.temporal_set_size))  # 560 x 1024
 
         # Add relu after clsW
-        query_embed = self.relu(query_embed) # 560 x 1024        
+        query_embed = self.relu(query_embed)  # 560 x 1024        
 
-        # init tensor to hold distances between every support tuple and every target tuple. It is of shape 20  x 5
-        '''
-            4-queries * 5 classes x 5(5 classes) and store this in a logit vector
-        '''
-        dist_all = torch.zeros(n_queries, self.args.way) # 20 x 5
+        # Initialize tensor to hold distances between every support tuple and every target tuple. Shape: (20, 5)
+        dist_all = torch.zeros(n_queries, self.args.way)  # 20 x 5
 
         for label_idx, c in enumerate(unique_labels):
             # Select keys corresponding to this class from the support set tuples
-            class_k = torch.index_select(support_set, 0, self._extract_class_indices(support_labels, c)) # 5 x 28 x 4096
+            class_k = torch.index_select(support_set, 0, self._extract_class_indices(support_labels, c))  # 5 x 28 x 4096
 
             # Reshaping the selected keys
-            class_k = class_k.view(-1, self.args.trans_linear_in_dim*self.temporal_set_size) # 140 x 4096
+            class_k = class_k.view(-1, self.args.trans_linear_in_dim * self.temporal_set_size)  # 140 x 4096
 
             # Get the support set projection from the current class
-            support_embed = self.clsW(class_k.to(queries.device))  # 140[5 x 28] x1024
+            support_embed = self.clsW(class_k.to(queries.device))  # 140 x 1024
 
             # Add relu after clsW
-            support_embed = self.relu(support_embed) # 140 x 1024
+            support_embed = self.relu(support_embed)  # 140 x 1024
 
             # Calculate p-norm distance between the query embedding and the support set embedding
-            distmat = torch.cdist(query_embed, support_embed) # 560[20 x 28] x 140[28 x 5]
+            distmat = torch.cdist(query_embed, support_embed)  # 560 x 140
 
-            # Across the 140 tuples compared against, get the minimum distance for each of the 560 queries
-            min_dist = distmat.min(dim=1)[0].reshape(n_queries, self.tuples_len) # 20[5-way x 4-queries] x 28
+            # Get the minimum distance for each of the 560 queries
+            min_dist = distmat.min(dim=1)[0].reshape(n_queries, self.tuples_len)  # 20 x 28
 
             # Average across the 28 tuples
             query_dist = min_dist.mean(dim=1)  # 20
 
-            # Make it negative as this has to be reduced.
+            # Make it negative as this has to be reduced
             distance = -1.0 * query_dist
             c_idx = c.long()
-            dist_all[:,c_idx] = distance # Insert into the required location.
+            dist_all[:, c_idx] = distance  # Insert into the required location
 
         return_dict = {'logits': dist_all}
-        
         return return_dict
 
     @staticmethod
     def _extract_class_indices(labels, which_class):
         """
         Helper method to extract the indices of elements which have the specified label.
-        :param labels: (torch.tensor) Labels of the context set.
-        :param which_class: Label for which indices are extracted.
-        :return: (torch.tensor) Indices in the form of a mask that indicate the locations of the specified label.
+
+        Args:
+            labels (torch.Tensor): Labels of the context set.
+            which_class (int): Label for which indices are extracted.
+
+        Returns:
+            torch.Tensor: Indices in the form of a mask that indicate the locations of the specified label.
         """
         class_mask = torch.eq(labels, which_class)  # binary mask of labels equal to which_class
         class_mask_indices = torch.nonzero(class_mask)  # indices of labels equal to which class
@@ -142,108 +225,113 @@ class DistanceLoss(nn.Module):
 
 
 class TemporalCrossTransformer(nn.Module):
+    """
+    A module to compute the temporal cross-transformer for the few-shot learning task.
+    """
     def __init__(self, args, temporal_set_size=3):
+        """
+        Initializes the TemporalCrossTransformer.
+
+        Args:
+            args: ArgumentParser object containing various settings.
+            temporal_set_size (int): The size of the temporal set, default is 3.
+        """
         super(TemporalCrossTransformer, self).__init__()
-       
+        
         self.args = args
         self.temporal_set_size = temporal_set_size
 
         max_len = int(self.args.seq_len * 1.5)
         self.pe = PositionalEncoding(self.args.trans_linear_in_dim, self.args.trans_dropout, max_len=max_len)
 
-        self.k_linear = nn.Linear(self.args.trans_linear_in_dim * temporal_set_size, self.args.trans_linear_out_dim)#.cuda()
-        self.v_linear = nn.Linear(self.args.trans_linear_in_dim * temporal_set_size, self.args.trans_linear_out_dim)#.cuda()
+        self.k_linear = nn.Linear(self.args.trans_linear_in_dim * temporal_set_size, self.args.trans_linear_out_dim)
+        self.v_linear = nn.Linear(self.args.trans_linear_in_dim * temporal_set_size, self.args.trans_linear_out_dim)
 
         self.norm_k = nn.LayerNorm(self.args.trans_linear_out_dim)
         self.norm_v = nn.LayerNorm(self.args.trans_linear_out_dim)
         
         self.class_softmax = torch.nn.Softmax(dim=1)
         
-        # generate all ordered tuples corresponding to the temporal set size 2 or 3.
+        # Generate all ordered tuples corresponding to the temporal set size 2 or 3.
         frame_idxs = [i for i in range(self.args.seq_len)]
         frame_combinations = combinations(frame_idxs, temporal_set_size)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        if device=='cuda':
+        if device == 'cuda':
             self.tuples = [torch.tensor(comb).cuda() for comb in frame_combinations]
         else:
             self.tuples = [torch.tensor(comb) for comb in frame_combinations]
-        self.tuples_len = len(self.tuples) #28
-    
-    def forward(self, support_set, support_labels, queries):
-        # support_set : 25 x 8 x 2048, support_labels: 25, queries: 20 x 8 x 2048
-        n_queries = queries.shape[0] #20
-        n_support = support_set.shape[0] #25
-        
-        # static pe after adding the position embedding
-        support_set = self.pe(support_set) # Support set is of shape 25 x 8 x 2048 -> 25 x 8 x 2048
-        queries = self.pe(queries) # Queries is of shape 20 x 8 x 2048 -> 20 x 8 x 2048
+        self.tuples_len = len(self.tuples) # 28 for temporal_set_size=3
 
-        # construct new queries and support set made of tuples of images after pe
-        # Support set s = number of tuples(28 for 2/56 for 3) stacked in a list form containing elements of form 25 x 4096(2 x 2048 - (2 frames stacked))
+    def forward(self, support_set, support_labels, queries):
+        """
+        Forward pass of the TemporalCrossTransformer.
+
+        Args:
+            support_set (torch.Tensor): Support set of shape (n_support, seq_len, feature_dim).
+            support_labels (torch.Tensor): Labels for the support set of shape (n_support).
+            queries (torch.Tensor): Query set of shape (n_queries, seq_len, feature_dim).
+
+        Returns:
+            dict: Dictionary containing logits of shape (n_queries, n_classes).
+        """
+        n_queries = queries.shape[0]
+        n_support = support_set.shape[0]
+        
+        # Apply positional encoding to support set and queries
+        support_set = self.pe(support_set)
+        queries = self.pe(queries)
+
+        # Construct new queries and support set made of tuples of images after positional encoding
         s = [torch.index_select(support_set, -2, p).reshape(n_support, -1) for p in self.tuples]
         q = [torch.index_select(queries, -2, p).reshape(n_queries, -1) for p in self.tuples]
 
-        support_set = torch.stack(s, dim=-2) # 25 x 28 x 4096
-        queries = torch.stack(q, dim=-2) # 20 x 28 x 4096
+        support_set = torch.stack(s, dim=-2)
+        queries = torch.stack(q, dim=-2)
 
-        # apply linear maps for performing self-normalization in the next step and the key map's output
-        '''
-            support_set_ks is of shape 25 x 28 x 1152, where 1152 is the dimension of the key = query head. converting the 5-way*5-shot x 28(tuples).
-            query_set_ks is of shape 20 x 28 x 1152 covering 4 query/sample*5-way x 28(number of tuples)
-        '''
-        support_set_ks = self.k_linear(support_set) # 25 x 28 x 1152
-        queries_ks = self.k_linear(queries) # 20 x 28 x 1152
-        support_set_vs = self.v_linear(support_set) # 25 x 28 x 1152
-        queries_vs = self.v_linear(queries) # 20 x 28 x 1152
+        # Apply linear maps and layer normalization
+        support_set_ks = self.k_linear(support_set)
+        queries_ks = self.k_linear(queries)
+        support_set_vs = self.v_linear(support_set)
+        queries_vs = self.v_linear(queries)
         
-        # apply norms where necessary
-        mh_support_set_ks = self.norm_k(support_set_ks).to(device) # 25 x 28 x 1152
-        mh_queries_ks = self.norm_k(queries_ks).to(device) # 20 x 28 x 1152
+        mh_support_set_ks = self.norm_k(support_set_ks).to(device)
+        mh_queries_ks = self.norm_k(queries_ks).to(device)
         support_labels = support_labels.to(device)
-        mh_support_set_vs = support_set_vs.to(device) # 25 x 28 x 1152
-        mh_queries_vs = queries_vs.to(device) # 20 x 28 x 1152
+        mh_support_set_vs = support_set_vs.to(device)
+        mh_queries_vs = queries_vs.to(device)
         
-        unique_labels = torch.unique(support_labels) # 5
+        unique_labels = torch.unique(support_labels)
 
-        # init tensor to hold distances between every support tuple and every target tuple. It is of shape 20  x 5
-        '''
-            4-queries * 5 classes x 5(5 classes) and store this in a logit vector
-        '''
-        all_distances_tensor = torch.zeros(n_queries, self.args.way) # 20 x 5
+        # Initialize tensor to hold distances between every support tuple and every target tuple
+        all_distances_tensor = torch.zeros(n_queries, self.args.way)
 
         for label_idx, c in enumerate(unique_labels):
-        
-            # select keys and values for just this class 
-            class_k = torch.index_select(mh_support_set_ks, 0, self._extract_class_indices(support_labels, c)) # 5 x 28 x 1152
-            class_v = torch.index_select(mh_support_set_vs, 0, self._extract_class_indices(support_labels, c)) # 5 x 28 x 1152
-            k_bs = class_k.shape[0] # 5
+            # Select keys and values for just this class
+            class_k = torch.index_select(mh_support_set_ks, 0, self._extract_class_indices(support_labels, c))
+            class_v = torch.index_select(mh_support_set_vs, 0, self._extract_class_indices(support_labels, c))
+            k_bs = class_k.shape[0]
 
-            class_scores = torch.matmul(mh_queries_ks.unsqueeze(1), class_k.transpose(-2,-1)) / math.sqrt(self.args.trans_linear_out_dim) # 20 x 5 x 28 x 28
+            # Compute class scores
+            class_scores = torch.matmul(mh_queries_ks.unsqueeze(1), class_k.transpose(-2, -1)) / math.sqrt(self.args.trans_linear_out_dim)
+            class_scores = class_scores.permute(0, 2, 1, 3)
+            class_scores = class_scores.reshape(n_queries, self.tuples_len, -1)
+            class_scores = [self.class_softmax(class_scores[i]) for i in range(n_queries)]
+            class_scores = torch.cat(class_scores)
+            class_scores = class_scores.reshape(n_queries, self.tuples_len, -1, self.tuples_len)
+            class_scores = class_scores.permute(0, 2, 1, 3)
 
-            # reshape etc. to apply a softmax for each query tuple
-            class_scores = class_scores.permute(0,2,1,3) # 20 x 28 x 5 x 28 
-            
-            # [For the 20 queries' 28 tuple pairs, find the best match against the 5 selected support samples from the same class
-            class_scores = class_scores.reshape(n_queries, self.tuples_len, -1) # 20 x 28 x 140
-            class_scores = [self.class_softmax(class_scores[i]) for i in range(n_queries)] # list(20) x 28 x 140
-            class_scores = torch.cat(class_scores) # 560 x 140 - concatenate all the scores for the tuples
-            class_scores = class_scores.reshape(n_queries, self.tuples_len, -1, self.tuples_len) # 20 x 28 x 5 x 28
-            class_scores = class_scores.permute(0,2,1,3) # 20 x 5 x 28 x 28
-            
-            # get query specific class prototype         
-            query_prototype = torch.matmul(class_scores, class_v) # 20 x 5 x 28 x 1152 
-            query_prototype = torch.sum(query_prototype, dim=1).to(device) # 20 x 28 x 1152 -> Sum across all the support set values of the corres. class
-            
-            # calculate distances from queries to query-specific class prototypes
-            diff = mh_queries_vs - query_prototype # 20 x 28 x 1152
-            norm_sq = torch.norm(diff, dim=[-2,-1])**2 # 20 
-            distance = torch.div(norm_sq, self.tuples_len) # 20
-            
-            # multiply by -1 to get logits
+            # Get query specific class prototype
+            query_prototype = torch.matmul(class_scores, class_v)
+            query_prototype = torch.sum(query_prototype, dim=1).to(device)
+
+            # Calculate distances from queries to query-specific class prototypes
+            diff = mh_queries_vs - query_prototype
+            norm_sq = torch.norm(diff, dim=[-2, -1])**2
+            distance = torch.div(norm_sq, self.tuples_len)
             distance = distance * -1
             c_idx = c.long()
-            all_distances_tensor[:,c_idx] = distance # 20
-        
+            all_distances_tensor[:, c_idx] = distance
+
         return_dict = {'logits': all_distances_tensor}
         
         return return_dict
@@ -252,13 +340,18 @@ class TemporalCrossTransformer(nn.Module):
     def _extract_class_indices(labels, which_class):
         """
         Helper method to extract the indices of elements which have the specified label.
-        :param labels: (torch.tensor) Labels of the context set.
-        :param which_class: Label for which indices are extracted.
-        :return: (torch.tensor) Indices in the form of a mask that indicate the locations of the specified label.
+
+        Args:
+            labels (torch.Tensor): Labels of the context set.
+            which_class (int): Label for which indices are extracted.
+
+        Returns:
+            torch.Tensor: Indices in the form of a mask that indicate the locations of the specified label.
         """
-        class_mask = torch.eq(labels, which_class)  # binary mask of labels equal to which_class
-        class_mask_indices = torch.nonzero(class_mask)  # indices of labels equal to which class
-        return torch.reshape(class_mask_indices, (-1,))  # reshape to be a 1D vector
+        class_mask = torch.eq(labels, which_class)  # Binary mask of labels equal to which_class
+        class_mask_indices = torch.nonzero(class_mask)  # Indices of labels equal to which class
+        return torch.reshape(class_mask_indices, (-1,))  # Reshape to be a 1D vector
+
 
 class Token_Perceptron(torch.nn.Module):
     '''
@@ -557,8 +650,8 @@ if __name__ == "__main__":
             self.num_gpus = 1
             self.temp_set = [2,3]
     args = ArgsObject()
-    torch.manual_seed(STRM(args))
-    
+    torch.manual_seed(0)
+    model = CNN_STRM(args).to(device)
     support_imgs = torch.rand(args.way * args.shot * args.seq_len,3, args.img_size, args.img_size)
     target_imgs = torch.rand(args.way * args.query_per_class * args.seq_len ,3, args.img_size, args.img_size)
     support_labels = torch.tensor([0,1,2,3,4])
