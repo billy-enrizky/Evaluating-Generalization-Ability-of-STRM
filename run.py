@@ -267,59 +267,109 @@ class Learner:
         return task_loss, task_accuracy
 
     def test(self, session, num_episode):
+        """
+        This function tests the model over a number of episodes. It calculates the accuracy and loss for each task and 
+        returns a dictionary containing the average accuracy, confidence interval, and average loss for the dataset.
+
+        Parameters:
+        session (Session): The current TensorFlow session.
+        num_episode (int): The number of episodes to test the model on.
+
+        Returns:
+        accuracy_dict (dict): A dictionary containing the average accuracy, confidence interval, and average loss for 
+                            the dataset.
+        """
+
+        # Set the model to evaluation mode
         self.model.eval()
+
+        # Disable gradient calculations
         with torch.no_grad():
 
-                self.video_loader.dataset.train = False
-                accuracy_dict ={}
-                accuracies = []
-                losses = []
-                iteration = 0
-                item = self.args.dataset
-                for task_dict in self.video_loader:
-                    if iteration >= self.args.num_test_tasks:
-                        break
-                    iteration += 1
+            # Set the dataset to testing mode
+            self.video_loader.dataset.train = False
 
-                    context_images, target_images, context_labels, target_labels, real_target_labels, batch_class_list = self.prepare_task(task_dict)
-                    model_dict = self.model(context_images, context_labels, target_images)
-                    target_logits = model_dict['logits'].to(self.device)
+            # Initialize the accuracy dictionary, accuracies list, losses list, and iteration counter
+            accuracy_dict = {}
+            accuracies = []
+            losses = []
+            iteration = 0
 
-                    # Target logits after applying query-distance-based similarity metric on patch-level enriched features   
-                    target_logits_post_pat = model_dict['logits_post_pat'].to(self.device)
+            # Get the name of the dataset
+            item = self.args.dataset
 
-                    target_labels = target_labels.to(self.device)
+            # Loop over the tasks in the video loader
+            for task_dict in self.video_loader:
 
-                    # Add the logits before computing the accuracy
-                    target_logits = target_logits + 0.1*target_logits_post_pat
+                # Break the loop if the number of tasks exceeds the specified number of test tasks
+                if iteration >= self.args.num_test_tasks:
+                    break
 
-                    accuracy = self.accuracy_fn(target_logits, target_labels)
-                    
-                    loss = self.loss(target_logits, target_labels, self.device)/self.args.num_test_tasks
-                   
-                    # Loss using the new distance metric after  patch-level enrichment
-                    loss_post_pat = self.loss(target_logits_post_pat, target_labels, self.device)/self.args.num_test_tasks
+                # Increment the iteration counter
+                iteration += 1
 
-                    # Joint loss
-                    loss = loss + 0.1*loss_post_pat
+                # Prepare the task
+                context_images, target_images, context_labels, target_labels, real_target_labels, batch_class_list = self.prepare_task(task_dict)
 
-                    eval_logger.info("For Task: {0}, the testing loss is {1} and Testing Accuracy is {2}".format(iteration + 1, loss.item(),
-                            accuracy.item()))
-                    losses.append(loss.item())    
-                    accuracies.append(accuracy.item())
-                    del target_logits
-                    del target_logits_post_pat
+                # Run the model on the task
+                model_dict = self.model(context_images, context_labels, target_images)
 
-                accuracy = np.array(accuracies).mean() * 100.0
-                confidence = (196.0 * np.array(accuracies).std()) / np.sqrt(len(accuracies))
-                loss = np.array(losses).mean()
-                accuracy_dict[item] = {"accuracy": accuracy, "confidence": confidence, "loss": loss}
-                eval_logger.info("For Task: {0}, the testing loss is {1} and Testing Accuracy is {2}".format(num_episode, loss, accuracy))
+                # Get the logits from the model dictionary and move them to the device
+                target_logits = model_dict['logits'].to(self.device)
 
-                self.video_loader.dataset.train = True
+                # Get the logits after applying the query-distance-based similarity metric on patch-level enriched features
+                target_logits_post_pat = model_dict['logits_post_pat'].to(self.device)
+
+                # Move the target labels to the device
+                target_labels = target_labels.to(self.device)
+
+                # Add the logits before computing the accuracy
+                target_logits = target_logits + 0.1*target_logits_post_pat
+
+                # Compute the accuracy
+                accuracy = self.accuracy_fn(target_logits, target_labels)
+
+                # Compute the loss
+                loss = self.loss(target_logits, target_labels, self.device)/self.args.num_test_tasks
+
+                # Compute the loss using the new distance metric after patch-level enrichment
+                loss_post_pat = self.loss(target_logits_post_pat, target_labels, self.device)/self.args.num_test_tasks
+
+                # Compute the joint loss
+                loss = loss + 0.1*loss_post_pat
+
+                # Log the testing loss and accuracy for the task
+                eval_logger.info("For Task: {0}, the testing loss is {1} and Testing Accuracy is {2}".format(iteration + 1, loss.item(),
+                        accuracy.item()))
+
+                # Append the loss and accuracy to their respective lists
+                losses.append(loss.item())    
+                accuracies.append(accuracy.item())
+
+                # Delete the logits to free up memory
+                del target_logits
+                del target_logits_post_pat
+
+            # Compute the average accuracy, confidence interval, and average loss
+            accuracy = np.array(accuracies).mean() * 100.0
+            confidence = (196.0 * np.array(accuracies).std()) / np.sqrt(len(accuracies))
+            loss = np.array(losses).mean()
+
+            # Add the average accuracy, confidence interval, and average loss to the accuracy dictionary
+            accuracy_dict[item] = {"accuracy": accuracy, "confidence": confidence, "loss": loss}
+
+            # Log the testing loss and accuracy for the episode
+            eval_logger.info("For Task: {0}, the testing loss is {1} and Testing Accuracy is {2}".format(num_episode, loss, accuracy))
+
+            # Set the dataset back to training mode
+            self.video_loader.dataset.train = True
+
+        # Set the model back to training mode
         self.model.train()
-        
+
+        # Return the accuracy dictionary
         return accuracy_dict
+
 
     def prepare_task(self, task_dict, images_to_device = True):
         """
