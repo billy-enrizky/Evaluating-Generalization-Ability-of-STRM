@@ -14,16 +14,41 @@ from videotransforms.video_transforms import Compose, Resize, RandomCrop, Random
 from videotransforms.volume_transforms import ClipToTensor
 
 """Contains video frame paths and ground truth labels for a single split (e.g. train videos). """
-class Split():
+class Split:
+    """
+    Class to manage video frame paths and ground truth labels for a dataset split (e.g., training, validation, or test).
+    """
     def __init__(self):
-        self.gt_a_list = []
-        self.videos = []
+        """
+        Initializes the Split class with empty lists for ground truth labels and video paths.
+        """
+        self.gt_a_list = []  # List to store ground truth labels
+        self.videos = []     # List to store video frame paths
     
     def add_vid(self, paths, gt_a):
+        """
+        Adds a video and its corresponding ground truth label to the dataset.
+
+        Args:
+            paths (list): List of frame paths for the video.
+            gt_a (int): Ground truth label for the video.
+        """
         self.videos.append(paths)
         self.gt_a_list.append(gt_a)
 
     def get_rand_vid(self, label, idx=-1):
+        """
+        Retrieves a random video and its index that matches the given label. 
+        Optionally, a specific index can be retrieved if provided.
+
+        Args:
+            label (int): Ground truth label to match.
+            idx (int): Specific index to retrieve, if provided. Default is -1.
+
+        Returns:
+            tuple: (video_paths, index) where video_paths is the list of frame paths 
+                   for the selected video and index is its position in the list.
+        """
         match_idxs = []
         for i in range(len(self.gt_a_list)):
             if label == self.gt_a_list[i]:
@@ -35,12 +60,33 @@ class Split():
         return self.videos[random_idx], random_idx
 
     def get_num_videos_for_class(self, label):
+        """
+        Counts the number of videos for a given ground truth label.
+
+        Args:
+            label (int): Ground truth label to count videos for.
+
+        Returns:
+            int: Number of videos that have the given ground truth label.
+        """
         return len([gt for gt in self.gt_a_list if gt == label])
 
     def get_unique_classes(self):
+        """
+        Retrieves a list of unique ground truth labels in the dataset.
+
+        Returns:
+            list: Unique ground truth labels.
+        """
         return list(set(self.gt_a_list))
 
     def get_max_video_len(self):
+        """
+        Finds the maximum length (number of frames) of videos in the dataset.
+
+        Returns:
+            int: Maximum number of frames in any video.
+        """
         max_len = 0
         for v in self.videos:
             l = len(v)
@@ -49,7 +95,14 @@ class Split():
         return max_len
 
     def __len__(self):
+        """
+        Returns the number of videos in the dataset.
+
+        Returns:
+            int: Number of videos.
+        """
         return len(self.gt_a_list)
+
 
 """Dataset for few-shot videos, which returns few-shot tasks. """
 class VideoDataset(torch.utils.data.Dataset):
