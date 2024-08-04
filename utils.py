@@ -10,7 +10,7 @@ class TestAccuracies:
     """
     Determines if an evaluation on the validation set is better than the best so far.
     In particular, this handles the case for meta-dataset where we validate on multiple datasets and we deem
-    the evaluation to be better if more than half of the validation accuracies on the individual validation datsets
+    the evaluation to be better if more than half of the validation accuracies on the individual validation datasets
     are better than the previous best.
     """
 
