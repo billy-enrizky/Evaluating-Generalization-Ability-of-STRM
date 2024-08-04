@@ -237,34 +237,59 @@ class Learner:
         self.logfile.close()
 
     def train_task(self, task_dict):
+        """
+        This function trains the model on a single task. It calculates the loss and accuracy for the task and 
+        performs backpropagation based on the loss.
+
+        Parameters:
+        task_dict (dict): A dictionary containing the task data.
+
+        Returns:
+        task_loss (torch.Tensor): The loss for the task.
+        task_accuracy (float): The accuracy for the task.
+        """
+
+        # Prepare the task
         context_images, target_images, context_labels, target_labels, real_target_labels, batch_class_list = self.prepare_task(task_dict)
 
+        # Move the images and labels to the device
         context_images = context_images.to(self.device)
         context_labels = context_labels.to(self.device)
         target_images = target_images.to(self.device)
 
+        # Run the model on the task
         model_dict = self.model(context_images, context_labels, target_images)
+
+        # Get the logits from the model dictionary and move them to the device
         target_logits = model_dict['logits'].to(self.device)
 
-        # Target logits after applying query-distance-based similarity metric on patch-level enriched features
+        # Get the logits after applying the query-distance-based similarity metric on patch-level enriched features
         target_logits_post_pat = model_dict['logits_post_pat'].to(self.device)
 
+        # Move the target labels to the device
         target_labels = target_labels.to(self.device)
 
+        # Compute the loss for the task
         task_loss = self.loss(target_logits, target_labels, self.device) / self.args.tasks_per_batch
+
+        # Compute the loss using the new distance metric after patch-level enrichment
         task_loss_post_pat = self.loss(target_logits_post_pat, target_labels, self.device) / self.args.tasks_per_batch
 
-        # Joint loss
+        # Compute the joint loss
         task_loss = task_loss + 0.1*task_loss_post_pat
 
         # Add the logits before computing the accuracy
         target_logits = target_logits + 0.1*target_logits_post_pat
 
+        # Compute the accuracy for the task
         task_accuracy = self.accuracy_fn(target_logits, target_labels)
 
+        # Perform backpropagation based on the loss
         task_loss.backward(retain_graph=False)
 
+        # Return the loss and accuracy for the task
         return task_loss, task_accuracy
+
 
     def test(self, session, num_episode):
         """
