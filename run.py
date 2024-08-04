@@ -103,8 +103,17 @@ class Learner:
     Command line parser
     """
     def parse_command_line(self):
+        """
+        This function parses the command-line arguments for the script. It uses the argparse library to define and parse the arguments.
+
+        Returns:
+            args: A namespace containing the arguments provided to the script.
+        """
+
+        # Initialize the argument parser
         parser = argparse.ArgumentParser()
 
+        # Define the command-line arguments
         parser.add_argument("--dataset", choices=["ssv2", "kinetics", "hmdb", "ucf"], default="ssv2", help="Dataset to use.")
         parser.add_argument("--learning_rate", "-lr", type=float, default=0.001, help="Learning rate.")
         parser.add_argument("--tasks_per_batch", type=int, default=16, help="Number of tasks between parameter optimizations.")
@@ -135,29 +144,34 @@ class Learner:
         parser.add_argument('--sch', nargs='+', type=int, help='iters to drop learning rate', default=[1000000])
         parser.add_argument("--test_model_only", type=bool, default=False, help="Only testing the model from the given checkpoint")
 
+        # Parse the command-line arguments
         args = parser.parse_args()
-        
+
+        # Set the scratch directory based on the argument value
         if args.scratch == "bc":
             args.scratch = "/mnt/storage/home2/tp8961/scratch"
         elif args.scratch == "bp":
             args.num_gpus = 4
-            # this is low becuase of RAM constraints for the data loader
+            # this is low because of RAM constraints for the data loader
             args.num_workers = 3
             args.scratch = "/work/tp8961"
         elif args.scratch == "new":
             args.scratch = "./datasets_and_splits/"
-        
+
+        # Check if a checkpoint directory is specified
         if args.checkpoint_dir == None:
             print("need to specify a checkpoint dir")
             exit(1)
 
+        # Set the image size and transformer linear input dimension based on the method
         if (args.method == "resnet50") or (args.method == "resnet34"):
             args.img_size = 224
         if args.method == "resnet50":
             args.trans_linear_in_dim = 2048
         else:
             args.trans_linear_in_dim = 512
-        
+
+        # Set the dataset paths based on the dataset argument
         if args.dataset == "ssv2":
             args.traintestlist = os.path.join(args.scratch, "splits/ssv2_OTAM/")
             args.path = os.path.join(args.scratch, "datasets/ssv2_256x256q5.zip")
@@ -171,70 +185,106 @@ class Learner:
             args.traintestlist = os.path.join(args.scratch, "splits/hmdb_ARN")
             args.path = os.path.join(args.scratch, "datasets/hmdb_256x256q5.zip")
 
+        # Save the arguments to a pickle file
         with open("args.pkl", "wb") as f:
             pickle.dump(args, f, pickle.HIGHEST_PROTOCOL)
 
+        # Return the parsed arguments
         return args
 
+
     def run(self):
+        """
+        This function runs the training loop for the model. It iterates over the tasks in the video loader, 
+        trains the model on each task, and performs optimization. It also logs the training statistics and 
+        saves the model checkpoints.
+
+        """
+
+        # Configure the TensorFlow session
         config = tf.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
+
+        # Start the TensorFlow session
         with tf.compat.v1.Session(config=config) as session:
-                train_accuracies = []
-                losses = []
-                total_iterations = self.args.training_iterations
 
-                iteration = self.start_iteration
+            # Initialize lists to store training accuracies and losses
+            train_accuracies = []
+            losses = []
 
-                if self.args.test_model_only:
-                    print("Model being tested at path: " + self.args.test_model_path)
-                    self.load_checkpoint()
-                    accuracy_dict = self.test(session, 1)
+            # Get the total number of training iterations
+            total_iterations = self.args.training_iterations
+
+            # Initialize the iteration counter
+            iteration = self.start_iteration
+
+            # If only testing the model, load the checkpoint and test the model
+            if self.args.test_model_only:
+                print("Model being tested at path: " + self.args.test_model_path)
+                self.load_checkpoint()
+                accuracy_dict = self.test(session, 1)
+                print(accuracy_dict)
+
+            # Iterate over the tasks in the video loader
+            for task_dict in self.video_loader:
+
+                # Break the loop if the iteration counter reaches the total number of iterations
+                if iteration >= total_iterations:
+                    break
+
+                # Increment the iteration counter
+                iteration += 1
+
+                # Enable gradient computation
+                torch.set_grad_enabled(True)
+
+                # Train the model on the task and get the task loss and accuracy
+                task_loss, task_accuracy = self.train_task(task_dict)
+
+                # Append the task accuracy and loss to the respective lists
+                train_accuracies.append(task_accuracy)
+                losses.append(task_loss)
+
+                # Perform optimization if the iteration counter is a multiple of the tasks per batch or if it's the last iteration
+                if ((iteration + 1) % self.args.tasks_per_batch == 0) or (iteration == (total_iterations - 1)):
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+
+                # Step the learning rate scheduler
+                self.scheduler.step()
+
+                # Print the training statistics if the iteration counter is a multiple of the print frequency
+                if (iteration + 1) % self.args.print_freq == 0:
+                    print_and_log(self.logfile,'Task [{}/{}], Train Loss: {:.7f}, Train Accuracy: {:.7f}'
+                                .format(iteration + 1, total_iterations, torch.Tensor(losses).mean().item(),
+                                        torch.Tensor(train_accuracies).mean().item()))
+                    train_logger.info("For Task: {0}, the training loss is {1} and Training Accuracy is {2}".format(iteration + 1, torch.Tensor(losses).mean().item(),
+                        torch.Tensor(train_accuracies).mean().item()))
+
+                    # Compute the average training accuracy and loss
+                    avg_train_acc = torch.Tensor(train_accuracies).mean().item()
+                    avg_train_loss = torch.Tensor(losses).mean().item()
+
+                    # Reset the lists for training accuracies and losses
+                    train_accuracies = []
+                    losses = []
+
+                # Save a model checkpoint if the iteration counter is a multiple of the save frequency and it's not the last iteration
+                if ((iteration + 1) % self.args.save_freq == 0) and (iteration + 1) != total_iterations:
+                    self.save_checkpoint(iteration + 1)
+
+                # Test the model and print the test accuracies if the iteration counter is in the list of test iterations and it's not the last iteration
+                if ((iteration + 1) in self.args.test_iters) and (iteration + 1) != total_iterations:
+                    accuracy_dict = self.test(session, iteration + 1)
                     print(accuracy_dict)
+                    self.test_accuracies.print(self.logfile, accuracy_dict)
 
+            # Save the final model
+            torch.save(self.model.state_dict(), self.checkpoint_path_final)
 
-                for task_dict in self.video_loader:
-                    if iteration >= total_iterations:
-                        break
-                    iteration += 1
-                    torch.set_grad_enabled(True)
-
-                    task_loss, task_accuracy = self.train_task(task_dict)
-                    train_accuracies.append(task_accuracy)
-                    losses.append(task_loss)
-
-                    # optimize
-                    if ((iteration + 1) % self.args.tasks_per_batch == 0) or (iteration == (total_iterations - 1)):
-                        self.optimizer.step()
-                        self.optimizer.zero_grad()
-                    self.scheduler.step()
-                    if (iteration + 1) % self.args.print_freq == 0:
-                        # print training stats
-                        print_and_log(self.logfile,'Task [{}/{}], Train Loss: {:.7f}, Train Accuracy: {:.7f}'
-                                      .format(iteration + 1, total_iterations, torch.Tensor(losses).mean().item(),
-                                              torch.Tensor(train_accuracies).mean().item()))
-                        train_logger.info("For Task: {0}, the training loss is {1} and Training Accuracy is {2}".format(iteration + 1, torch.Tensor(losses).mean().item(),
-                            torch.Tensor(train_accuracies).mean().item()))
-
-                        avg_train_acc = torch.Tensor(train_accuracies).mean().item()
-                        avg_train_loss = torch.Tensor(losses).mean().item()
-                        
-                        train_accuracies = []
-                        losses = []
-
-                    if ((iteration + 1) % self.args.save_freq == 0) and (iteration + 1) != total_iterations:
-                        self.save_checkpoint(iteration + 1)
-
-
-                    if ((iteration + 1) in self.args.test_iters) and (iteration + 1) != total_iterations:
-                        accuracy_dict = self.test(session, iteration + 1)
-                        print(accuracy_dict)
-                        self.test_accuracies.print(self.logfile, accuracy_dict)
-
-                # save the final model
-                torch.save(self.model.state_dict(), self.checkpoint_path_final)
-
+        # Close the log file
         self.logfile.close()
+
 
     def train_task(self, task_dict):
         """
