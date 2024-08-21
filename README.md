@@ -43,7 +43,7 @@ We provide several enhancements and additional resources not available in the or
 ### Step 1: Environment Setup
 
 ```bash
-conda create -f environment.yaml
+conda env create -f environment.yaml
 conda activate env_ani
 ```
 
