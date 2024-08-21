@@ -13,19 +13,17 @@ class SiameseNetwork(nn.Module):
         super(SiameseNetwork, self).__init__()
         self.backbone = backbone
 
-    def forward(self, input1, input2):
-        # Pass both inputs through the same CNN backbone
-        output1 = self.backbone(input1)
-        output2 = self.backbone(input2)
+    def forward(self, support_images, context_labels, target_images):
+        # Get the feature dictionaries for support and target images
+        support_output = self.backbone(support_images, context_labels, target_images)
+        target_output = self.backbone(target_images, context_labels, target_images)
         
-        # Ensure we extract the correct features from CNN_STRM's output
-        if isinstance(output1, dict) and 'features' in output1:
-            output1 = output1['features']
-        if isinstance(output2, dict) and 'features' in output2:
-            output2 = output2['features']
+        # Extract the features needed for distance computation from the output dictionaries
+        support_features = support_output['logits_post_pat']  # Adjust based on what features you want to use
+        target_features = target_output['logits_post_pat']  # Adjust accordingly
 
         # Compute the similarity between the two outputs using L2 distance
-        distance = F.pairwise_distance(output1, output2, p=2)
+        distance = F.pairwise_distance(support_features, target_features, p=2)
         
         return distance
 
@@ -43,23 +41,21 @@ class ArgsObject(object):
         self.img_size = 84
         self.method = "resnet50"
         self.num_gpus = 1
-        self.temp_set = [2,3]
+        self.temp_set = [2, 3]
 
 args = ArgsObject()
 torch.manual_seed(0)
 
 # Initialize the CNN_STRM model
-model = CNN_STRM(args).to(device)
+cnn_strm_backbone = CNN_STRM(args).to(device)
+siamese_network = SiameseNetwork(cnn_strm_backbone).to(device)
 
 # Generate example data
 support_imgs = torch.rand(args.way * args.shot * args.seq_len, 3, args.img_size, args.img_size).to(device)
 target_imgs = torch.rand(args.way * args.query_per_class * args.seq_len, 3, args.img_size, args.img_size).to(device)
 support_labels = torch.tensor([0, 1, 2, 3, 4]).to(device)
 
-# Initialize and test the Siamese Network using CNN_STRM as the backbone
-cnn_strm_backbone = CNN_STRM(args).to(device)
-siamese_network = SiameseNetwork(cnn_strm_backbone).to(device)
-
 # Example forward pass through the Siamese Network
-distance = siamese_network(support_imgs, target_imgs)
+distance = siamese_network(support_imgs, support_labels, target_imgs)
 print(f"Distance between support and target images: {distance}")
+
