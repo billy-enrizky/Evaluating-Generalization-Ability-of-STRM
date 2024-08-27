@@ -15,11 +15,13 @@ class SiameseNetwork(nn.Module):
         super(SiameseNetwork, self).__init__()
         self.backbone = backbone
 
-    def forward(self, support_images, context_labels, target_images):
+    def forward(self, support_images, context_labels, target_images, target_labels=torch.empty(0)):
         # Get the feature dictionaries for support and target images
         support_output = self.backbone(support_images, context_labels, target_images)
-        target_output = self.backbone(target_images, context_labels, target_images)
-        
+        if target_labels.numel() == 0:
+            target_output = self.backbone(target_images, context_labels, target_images)
+        else:
+            target_output = self.backbone(target_images, target_labels, target_images)
         # Extract the features needed for distance computation from the output dictionaries
         support_features = support_output['logits_post_pat']  # Adjust based on what features you want to use
         target_features = target_output['logits_post_pat']  # Adjust accordingly

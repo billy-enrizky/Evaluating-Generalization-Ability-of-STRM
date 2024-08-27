@@ -32,10 +32,10 @@ def setup_logger(name, log_file, level = logging.INFO):
     return logger
     
 # logger for training accuracies
-train_logger = setup_logger('Training_accuracy', './runs_strm/train_output.log')
+train_logger = setup_logger('Training_accuracy', './runs_strm/train_snn_output.log')
 
 # logger for evaluation accuracies
-eval_logger = setup_logger('Evaluation_accuracy', './runs_strm/eval_output.log')    
+eval_logger = setup_logger('Evaluation_accuracy', './runs_strm/eval_snn_output.log')    
 
 #############################################
 #setting up seeds
@@ -131,15 +131,15 @@ class Learner:
         parser.add_argument("--query_per_class", type=int, default=5, help="Target samples (i.e. queries) per class used for training.")
         parser.add_argument("--query_per_class_test", type=int, default=1, help="Target samples (i.e. queries) per class used for testing.")
         parser.add_argument('--test_iters', nargs='+', type=int, help='iterations to test at. Default is for ssv2 otam split.', default=[75000])
-        parser.add_argument("--num_test_tasks", type=int, default=1000, help="number of random tasks to test on.")
-        parser.add_argument("--print_freq", type=int, default=1000, help="print and log every n iterations.")
+        parser.add_argument("--num_test_tasks", type=int, default=10, help="number of random tasks to test on.")
+        parser.add_argument("--print_freq", type=int, default=10, help="print and log every n iterations.")
         parser.add_argument("--seq_len", type=int, default=8, help="Frames per video.")
         parser.add_argument("--num_workers", type=int, default=10, help="Num dataloader workers.")
         parser.add_argument("--method", choices=["resnet18", "resnet34", "resnet50"], default="resnet50", help="method")
         parser.add_argument("--trans_linear_out_dim", type=int, default=1152, help="Transformer linear_out_dim")
         parser.add_argument("--opt", choices=["adam", "sgd"], default="sgd", help="Optimizer")
         parser.add_argument("--trans_dropout", type=int, default=0.1, help="Transformer dropout")
-        parser.add_argument("--save_freq", type=int, default=1000, help="Number of iterations between checkpoint saves.")
+        parser.add_argument("--save_freq", type=int, default=10, help="Number of iterations between checkpoint saves.")
         parser.add_argument("--img_size", type=int, default=224, help="Input image size to the CNN after cropping.")
         parser.add_argument('--temp_set', nargs='+', type=int, help='cardinalities e.g. 2,3 is pairs and triples', default=[2,3])
         parser.add_argument("--scratch", choices=["bc", "bp", "new"], default="new", help="directory containing dataset, splits, and checkpoint saves.")
@@ -372,10 +372,10 @@ class Learner:
                 iteration += 1
 
                 # Prepare the task
-                support_images, target_images, support_labels, target_labels, real_target_labels, batch_class_list = self.prepare_task(task_dict)
+                context_images, target_images, context_labels, target_labels, real_target_labels, batch_class_list = self.prepare_task(task_dict)
 
                 # Run the model on the task
-                distance = self.model(support_images, support_labels, target_images)
+                distance = self.model(context_images, context_labels, target_images, target_labels)
 
                 # Compute the loss
                 loss = loss_function(distance, target_labels, self.device)
@@ -475,7 +475,10 @@ def loss_function(distance, target_labels, device):
     Returns:
     torch.Tensor: The computed loss.
     """
-    # Example of contrastive loss; you can customize this based on your specific task.
+    # Ensure target_labels has the same shape as distance
+    if target_labels.dim() == 1:
+        target_labels = target_labels.unsqueeze(0)
+
     loss = F.mse_loss(distance, target_labels.float().to(device))
     return loss
 
