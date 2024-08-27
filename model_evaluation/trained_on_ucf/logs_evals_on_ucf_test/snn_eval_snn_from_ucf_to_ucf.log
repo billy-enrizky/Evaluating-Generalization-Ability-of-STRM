@@ -1,0 +1,11 @@
+2024-08-27 21:53:09,545 INFO For Task: 2, the testing loss is 2.8292129039764404 and Testing Accuracy is 0.20000000298023224
+2024-08-27 21:53:46,644 INFO For Task: 3, the testing loss is 1.3697859048843384 and Testing Accuracy is 0.20000000298023224
+2024-08-27 21:54:23,640 INFO For Task: 4, the testing loss is 3.4261868000030518 and Testing Accuracy is 0.20000000298023224
+2024-08-27 21:55:00,938 INFO For Task: 5, the testing loss is 4.226080894470215 and Testing Accuracy is 0.20000000298023224
+2024-08-27 21:55:37,839 INFO For Task: 6, the testing loss is 3.0628933906555176 and Testing Accuracy is 0.20000000298023224
+2024-08-27 21:56:15,827 INFO For Task: 7, the testing loss is 4.281726360321045 and Testing Accuracy is 0.20000000298023224
+2024-08-27 21:56:53,844 INFO For Task: 8, the testing loss is 3.934034824371338 and Testing Accuracy is 0.20000000298023224
+2024-08-27 21:57:31,840 INFO For Task: 9, the testing loss is 2.644003391265869 and Testing Accuracy is 0.20000000298023224
+2024-08-27 21:58:09,243 INFO For Task: 10, the testing loss is 2.1306416988372803 and Testing Accuracy is 0.20000000298023224
+2024-08-27 21:58:46,745 INFO For Task: 11, the testing loss is 2.643244504928589 and Testing Accuracy is 0.20000000298023224
+2024-08-27 21:58:47,934 INFO Average, the testing loss is 3.0547810673713682 and Testing Accuracy is 20.000000298023224
