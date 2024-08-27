@@ -17,6 +17,9 @@ torch.manual_seed(3483)
 torch.cuda.manual_seed(3483)
 torch.cuda.manual_seed_all(3483)
 
+import ssl
+
+ssl._create_default_https_context = ssl._create_unverified_context
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class PositionalEncoding(nn.Module):

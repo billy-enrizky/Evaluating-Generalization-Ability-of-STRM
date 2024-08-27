@@ -76,6 +76,7 @@ Adjust the parameters based on your setup:
 ```bash
 python3 run.py -c checkpoint_dir_ucf101/ --query_per_class 4 --shot 5 --way 5 --trans_linear_out_dim 1152 --tasks_per_batch 16 --test_iters 1000 --dataset ucf --split 3 -lr 0.001 --method resnet50 --img_size 224 --scratch new --num_gpus 0 --print_freq 1 --save_freq 1000 --training_iterations 0 --temp_set 2 --test_model_only True --test_model_path checkpoint_ucf.pt
 ```
+python3 run_siamese.py -c checkpoint_dir_ucf101/ --query_per_class 4 --shot 5 --way 5 --trans_linear_out_dim 1152 --tasks_per_batch 16 --test_iters 1000 --dataset ucf --split 3 -lr 0.001 --method resnet50 --img_size 224 --scratch new --num_gpus 0 --print_freq 1 --save_freq 1000 --training_iterations 0 --temp_set 2 --test_model_only True --test_model_path checkpoint_ucf.pt
 
 #### Evaluating on HMDB51
 Adjust the parameters based on your setup:
